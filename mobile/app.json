@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "MindCheck",
+    "slug": "MindCheck",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo_mindCheck.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F8D7E3",
+        "foregroundImage": "./assets/logo_mindCheck.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-sharing"
+    ]
+  }
+}

@@ -1,0 +1,228 @@
+import * as SecureStore from 'expo-secure-store';
+import { resetToOnboardingWithSessionExpired } from '../navigation/navigationRef';
+
+const API_URL = 'http://192.168.8.102:8000';
+
+async function getToken() {
+    return SecureStore.getItemAsync('access_token');
+}
+
+export class SessionExpiredError extends Error {
+    constructor() {
+        super('Your session expired. Please log in again.');
+    }
+}
+
+export class NetworkError extends Error {
+    constructor() {
+        super('Could not reach the server. Check your connection and try again.');
+    }
+}
+
+// Envuelve cualquier fetch crudo para distinguir "el servidor respondió
+// con un error" de "no se pudo ni siquiera contactar al servidor"
+// (wifi caída, IP mal puesta, servidor apagado). fetch() lanza un
+// TypeError genérico en ese segundo caso, sin status code.
+async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+        return await fetch(url, init);
+    } catch {
+        throw new NetworkError();
+    }
+}
+
+async function handleUnauthorized() {
+    await SecureStore.deleteItemAsync('access_token');
+    resetToOnboardingWithSessionExpired();
+}
+
+// Wrapper para cualquier llamada que requiera token. Si el backend responde 401
+// (token expirado o inválido), borra el token local y manda al usuario a Onboarding.
+async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const token = await getToken();
+    const res = await safeFetch(`${API_URL}${path}`, {
+        ...init,
+        headers: {
+            ...(init.headers || {}),
+            Authorization: `Bearer ${token}`,
+        },
+    });
+
+    if (res.status === 401) {
+        await handleUnauthorized();
+        throw new SessionExpiredError();
+    }
+
+    return res;
+}
+
+export class AuthError extends Error {
+    kind: 'email_in_use' | 'invalid_credentials' | 'weak_password' | 'generic';
+
+    constructor(kind: AuthError['kind'], message: string) {
+        super(message);
+        this.kind = kind;
+    }
+}
+
+export async function register(email: string, password: string) {
+    const res = await safeFetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+        if (res.status === 400) {
+            throw new AuthError('email_in_use', 'This email is already in use.');
+        }
+        if (res.status === 422) {
+            // Pydantic manda el detalle como lista de errores de validación,
+            // no como string simple. Buscamos si el campo "password" es el
+            // que falló, para dar un mensaje específico en vez del genérico.
+            let detail: any = null;
+            try {
+                detail = (await res.json()).detail;
+            } catch {
+                // sin body legible -> mensaje genérico
+            }
+            const passwordIssue = Array.isArray(detail)
+                ? detail.find((d: any) => Array.isArray(d.loc) && d.loc.includes('password'))
+                : null;
+            if (passwordIssue) {
+                throw new AuthError('weak_password', 'Password must be at least 8 characters.');
+            }
+            throw new AuthError('generic', 'Please enter a valid email and password.');
+        }
+        throw new AuthError('generic', 'Could not create your account.');
+    }
+
+    const data = await res.json();
+    await SecureStore.setItemAsync('access_token', data.access_token);
+    return data;
+}
+
+export async function login(email: string, password: string) {
+    const body = new URLSearchParams();
+    body.append('username', email);
+    body.append('password', password);
+
+    const res = await safeFetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+    });
+
+    if (!res.ok) {
+        if (res.status === 401) {
+            throw new AuthError('invalid_credentials', 'Email or password is incorrect.');
+        }
+        throw new AuthError('generic', 'Could not log in.');
+    }
+
+    const data = await res.json();
+    await SecureStore.setItemAsync('access_token', data.access_token);
+    return data;
+}
+
+export async function hasSession() {
+    return (await getToken()) !== null;
+}
+
+export async function logout() {
+    await SecureStore.deleteItemAsync('access_token');
+}
+
+export type CurrentUser = {
+    email: string;
+    created_at: string;
+};
+
+export async function getMe(): Promise<CurrentUser> {
+    const res = await authorizedFetch('/auth/me');
+    if (!res.ok) throw new Error('Could not load your account');
+    return res.json();
+}
+
+export type AnalyzeResult = {
+    depression_score: number;
+    suicide_risk_score: number;
+    risk_score: number;
+    category: string;
+    high_risk: boolean;
+};
+
+export class AnalyzeError extends Error {
+    kind: 'not_english' | 'too_short' | 'generic';
+    wordCount?: number;
+    minWords?: number;
+
+    constructor(
+        kind: 'not_english' | 'too_short' | 'generic',
+        message: string,
+        extra?: { wordCount?: number; minWords?: number }
+    ) {
+        super(message);
+        this.kind = kind;
+        this.wordCount = extra?.wordCount;
+        this.minWords = extra?.minWords;
+    }
+}
+
+export async function analyzeEntry(text: string): Promise<AnalyzeResult> {
+    const res = await authorizedFetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+    });
+
+    if (!res.ok) {
+        let detail: any = null;
+        try {
+            detail = (await res.json()).detail;
+        } catch {
+            // no readable JSON body -> stays as generic error
+        }
+
+        if (detail === 'not_english') {
+            throw new AnalyzeError('not_english', 'Please write your entry in English.');
+        }
+        if (detail && typeof detail === 'object' && detail.error === 'too_short') {
+            const missing = detail.min_words - detail.word_count;
+            throw new AnalyzeError(
+                'too_short',
+                `Write a little more — about ${missing} more word${missing === 1 ? '' : 's'} and you're set.`,
+                { wordCount: detail.word_count, minWords: detail.min_words }
+            );
+        }
+        throw new AnalyzeError('generic', 'Could not analyze this entry');
+    }
+
+    return res.json();
+}
+
+export type JournalEntry = {
+    id: number;
+    text: string;
+    depression_score: number;
+    suicide_risk_score: number;
+    risk_score: number;
+    category: string;
+};
+
+export async function getEntries(): Promise<JournalEntry[]> {
+    const res = await authorizedFetch('/entries');
+    if (!res.ok) throw new Error('Could not load your history');
+    return res.json();
+}
+
+export async function exportMyData(): Promise<unknown> {
+    const res = await authorizedFetch('/account/export');
+    if (!res.ok) throw new Error('Could not export your data');
+    return res.json();
+}
+
+export async function deleteMyAccount(): Promise<void> {
+    const res = await authorizedFetch('/account/', { method: 'DELETE' });
+    if (!res.ok) throw new Error('Could not delete your account');
+}
