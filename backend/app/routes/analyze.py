@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -35,6 +36,7 @@ class EntryResponse(BaseModel):
     suicide_risk_score: float
     risk_score: float
     category: str
+    created_at: datetime  # necesario para calcular la racha de días en el frontend
 
     class Config:
         from_attributes = True
@@ -104,6 +106,7 @@ def list_entries(
             suicide_risk_score=row.suicide_risk_score,
             risk_score=row.risk_score,
             category=row.category,
+            created_at=row.created_at,
         )
         for row in rows
     ]

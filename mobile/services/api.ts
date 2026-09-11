@@ -19,10 +19,6 @@ export class NetworkError extends Error {
     }
 }
 
-// Envuelve cualquier fetch crudo para distinguir "el servidor respondió
-// con un error" de "no se pudo ni siquiera contactar al servidor"
-// (wifi caída, IP mal puesta, servidor apagado). fetch() lanza un
-// TypeError genérico en ese segundo caso, sin status code.
 async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
     try {
         return await fetch(url, init);
@@ -36,8 +32,6 @@ async function handleUnauthorized() {
     resetToOnboardingWithSessionExpired();
 }
 
-// Wrapper para cualquier llamada que requiera token. Si el backend responde 401
-// (token expirado o inválido), borra el token local y manda al usuario a Onboarding.
 async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
     const token = await getToken();
     const res = await safeFetch(`${API_URL}${path}`, {
@@ -77,9 +71,6 @@ export async function register(email: string, password: string) {
             throw new AuthError('email_in_use', 'This email is already in use.');
         }
         if (res.status === 422) {
-            // Pydantic manda el detalle como lista de errores de validación,
-            // no como string simple. Buscamos si el campo "password" es el
-            // que falló, para dar un mensaje específico en vez del genérico.
             let detail: any = null;
             try {
                 detail = (await res.json()).detail;
@@ -142,6 +133,45 @@ export async function getMe(): Promise<CurrentUser> {
     const res = await authorizedFetch('/auth/me');
     if (!res.ok) throw new Error('Could not load your account');
     return res.json();
+}
+
+export class PasswordChangeError extends Error {
+    kind: 'wrong_current' | 'same_password' | 'weak_password' | 'generic';
+
+    constructor(kind: PasswordChangeError['kind'], message: string) {
+        super(message);
+        this.kind = kind;
+    }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const res = await authorizedFetch('/auth/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+
+    if (!res.ok) {
+        if (res.status === 400) {
+            let detail: any = null;
+            try {
+                detail = (await res.json()).detail;
+            } catch {
+                // sin body legible -> mensaje genérico
+            }
+            if (detail === 'wrong_current_password') {
+                throw new PasswordChangeError('wrong_current', 'Current password is incorrect.');
+            }
+            if (detail === 'same_password') {
+                throw new PasswordChangeError('same_password', 'New password must be different from the current one.');
+            }
+            throw new PasswordChangeError('generic', 'Could not change your password.');
+        }
+        if (res.status === 422) {
+            throw new PasswordChangeError('weak_password', 'New password must be at least 8 characters.');
+        }
+        throw new PasswordChangeError('generic', 'Could not change your password.');
+    }
 }
 
 export type AnalyzeResult = {
@@ -208,6 +238,7 @@ export type JournalEntry = {
     suicide_risk_score: number;
     risk_score: number;
     category: string;
+    created_at: string;
 };
 
 export async function getEntries(): Promise<JournalEntry[]> {

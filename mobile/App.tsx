@@ -8,18 +8,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text, Switch, StyleSheet, ActivityIndicator } from 'react-native';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import JournalScreen from './screens/JournalScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import EntryDetailScreen from './screens/EntryDetailScreen';
 import ResourcesScreen from './screens/ResourcesScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { hasSession } from './services/api';
+import { hasSession, JournalEntry } from './services/api';
 import { navigationRef } from './navigation/navigationRef';
 import { ThemeProvider, useTheme } from './theme/ThemeContext';
 import { spacing } from './theme';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { TouchableOpacity } from 'react-native';
+
+export type HistoryStackParamList = {
+  HistoryList: undefined;
+  EntryDetail: { entry: JournalEntry };
+};
 
 export type MainDrawerParamList = {
   Journal: undefined;
-  History: undefined;
+  HistoryStack: undefined;
   Resources: { autoTriggered?: boolean } | undefined;
   Settings: undefined;
 };
@@ -27,11 +36,13 @@ export type MainDrawerParamList = {
 export type RootStackParamList = {
   Login: { sessionExpired?: boolean } | undefined;
   Register: undefined;
+  ChangePassword: undefined;
   Main: { screen?: keyof MainDrawerParamList; params?: any } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Drawer = createDrawerNavigator<MainDrawerParamList>();
+const HistoryStack = createNativeStackNavigator<HistoryStackParamList>();
 
 function CustomDrawerContent(props: any) {
   const { colors, isDark, toggleScheme } = useTheme();
@@ -54,12 +65,45 @@ function CustomDrawerContent(props: any) {
   );
 }
 
+function HistoryMenuButton() {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.getParent()?.dispatch(DrawerActions.openDrawer())}
+      style={{ paddingHorizontal: spacing.md }}
+    >
+      <Ionicons name="menu" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
+}
+
+function HistoryStackNavigator() {
+  const { colors } = useTheme();
+  return (
+    <HistoryStack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.primary },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '700' },
+      }}
+    >
+      <HistoryStack.Screen
+        name="HistoryList"
+        component={HistoryScreen}
+        options={{ title: 'History', headerLeft: () => <HistoryMenuButton /> }}
+      />
+      <HistoryStack.Screen name="EntryDetail" component={EntryDetailScreen} options={{ title: 'Entry' }} />
+    </HistoryStack.Navigator>
+  );
+}
+
 function MainDrawer() {
   const { colors } = useTheme();
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ route }) => ({
+        headerShown: route.name !== 'HistoryStack',
         headerStyle: { backgroundColor: colors.primary },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
@@ -71,7 +115,7 @@ function MainDrawer() {
         drawerIcon: ({ color, size }) => {
           const icons: Record<keyof MainDrawerParamList, any> = {
             Journal: 'create-outline',
-            History: 'stats-chart-outline',
+            HistoryStack: 'stats-chart-outline',
             Resources: 'heart-outline',
             Settings: 'settings-outline',
           };
@@ -80,7 +124,7 @@ function MainDrawer() {
       })}
     >
       <Drawer.Screen name="Journal" component={JournalScreen} options={{ title: 'Journal' }} />
-      <Drawer.Screen name="History" component={HistoryScreen} options={{ title: 'History' }} />
+      <Drawer.Screen name="HistoryStack" component={HistoryStackNavigator} options={{ title: 'History' }} />
       <Drawer.Screen name="Resources" component={ResourcesScreen} options={{ title: 'Help Resources' }} />
       <Drawer.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
     </Drawer.Navigator>
@@ -141,6 +185,17 @@ function Navigation() {
       <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen
+          name="ChangePassword"
+          component={ChangePasswordScreen}
+          options={{
+            headerShown: true,
+            title: 'Change password',
+            headerStyle: { backgroundColor: colors.primary },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: '700' },
+          }}
+        />
         <Stack.Screen name="Main" component={MainDrawer} />
       </Stack.Navigator>
     </NavigationContainer>

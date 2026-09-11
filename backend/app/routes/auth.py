@@ -14,9 +14,6 @@ router = APIRouter()
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    # Longitud mínima real: antes se aceptaba cualquier string, incluida
-    # una contraseña vacía. 8 caracteres es un mínimo razonable sin
-    # imponer reglas de complejidad más agresivas por ahora.
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -28,6 +25,11 @@ class TokenResponse(BaseModel):
 class MeResponse(BaseModel):
     email: str
     created_at: datetime
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -61,3 +63,24 @@ def me(current_user: User = Depends(get_current_user)):
     """Devuelve la cuenta actualmente autenticada, para que el frontend
     pueda confirmar 'estás logueada como X' antes de acciones sensibles."""
     return MeResponse(email=current_user.email, created_at=current_user.created_at)
+
+
+@router.patch("/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        # 400, no 401: el token sigue siendo válido, es la contraseña
+        # actual la que no coincide. En el resto de la API, 401 significa
+        # "token inválido/expirado" y el frontend reacciona a eso cerrando
+        # la sesión automáticamente — reutilizarlo aquí lo confundiría con
+        # una expiración de sesión que no ha ocurrido.
+        raise HTTPException(status_code=400, detail="wrong_current_password")
+
+    if payload.new_password == payload.current_password:
+        raise HTTPException(status_code=400, detail="same_password")
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()

@@ -1,29 +1,49 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MainDrawerParamList, RootStackParamList } from '../App';
-import { analyzeEntry, AnalyzeError, SessionExpiredError, NetworkError } from '../services/api';
+import { analyzeEntry, getEntries, AnalyzeError, SessionExpiredError, NetworkError } from '../services/api';
+import { computeStreak, StreakInfo } from '../utils/streak';
+import { getRandomPrompt } from '../utils/prompts';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 
-type Props = CompositeScreenProps<
+type JournalScreenProps = CompositeScreenProps<
     DrawerScreenProps<MainDrawerParamList, 'Journal'>,
     NativeStackScreenProps<RootStackParamList>
 >;
 
 type Feedback = { type: 'error' | 'success'; text: string } | null;
 
-export default function JournalScreen({ navigation }: Props) {
+export default function JournalScreen({ navigation }: JournalScreenProps) {
     const { colors } = useTheme();
     const [text, setText] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [feedback, setFeedback] = useState<Feedback>(null);
+    const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
+    const [prompt, setPrompt] = useState(() => getRandomPrompt());
+
+    const loadStreak = useCallback(() => {
+        getEntries()
+            .then((entries) => setStreakInfo(computeStreak(entries)))
+            .catch(() => {
+                // fallo de red o sesión expirada -> simplemente no mostramos
+                // la racha, el resto de la pantalla sigue siendo usable
+            });
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadStreak();
+        }, [loadStreak])
+    );
 
     async function handleSave() {
         if (!text.trim()) return;
@@ -32,11 +52,13 @@ export default function JournalScreen({ navigation }: Props) {
         try {
             const result = await analyzeEntry(text);
             setText('');
+            setPrompt(getRandomPrompt(prompt)); // nueva sugerencia lista para la próxima entrada
             if (result.high_risk) {
                 navigation.navigate('Resources', { autoTriggered: true });
                 return;
             }
             setFeedback({ type: 'success', text: 'Entry saved. Thanks for writing today.' });
+            loadStreak();
         } catch (e: any) {
             if (e instanceof SessionExpiredError) return; // ya se está redirigiendo a Onboarding
             if (e instanceof NetworkError) {
@@ -51,6 +73,19 @@ export default function JournalScreen({ navigation }: Props) {
         }
     }
 
+    function streakLabel(): string | null {
+        if (!streakInfo) return null;
+        if (streakInfo.streak === 0) return 'Write today to start a streak.';
+        if (streakInfo.hasEntryToday) {
+            return streakInfo.streak === 1
+                ? '🔥 1-day streak — you wrote today.'
+                : `🔥 ${streakInfo.streak}-day streak — you wrote today.`;
+        }
+        return `🔥 ${streakInfo.streak}-day streak — write today to keep it going.`;
+    }
+
+    const label = streakLabel();
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
             <KeyboardAvoidingView
@@ -63,7 +98,26 @@ export default function JournalScreen({ navigation }: Props) {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
+                    {!!label && (
+                        <View style={[styles.streakBanner, { backgroundColor: colors.primaryLight }]}>
+                            <Text style={[styles.streakText, { color: colors.primaryDark }]}>{label}</Text>
+                        </View>
+                    )}
+
                     <Text style={[styles.label, { color: colors.textPrimary }]}>How are you feeling today?</Text>
+
+                    {text.trim().length === 0 && (
+                        <View style={styles.promptRow}>
+                            <Text style={[styles.promptText, { color: colors.textSecondary }]}>💭 {prompt}</Text>
+                            <TouchableOpacity
+                                onPress={() => setPrompt(getRandomPrompt(prompt))}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                                <Text style={[styles.promptRefresh, { color: colors.primary }]}>Try another</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
                     <TextInput
                         style={[styles.textArea, { borderColor: colors.border, backgroundColor: colors.card, color: colors.textPrimary }]}
                         multiline
@@ -101,7 +155,12 @@ export default function JournalScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
     container: { flexGrow: 1, padding: spacing.lg },
+    streakBanner: { borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+    streakText: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
     label: { fontSize: 18, fontWeight: '600', marginBottom: spacing.sm },
+    promptRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+    promptText: { fontSize: 13, fontStyle: 'italic', flex: 1, marginRight: spacing.sm },
+    promptRefresh: { fontSize: 12, fontWeight: '600' },
     textArea: {
         minHeight: 220,
         borderWidth: 1,

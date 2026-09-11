@@ -38,9 +38,7 @@ export default function SettingsScreen({ navigation }: Props) {
                 })
                 .catch((e) => {
                     if (!isActive) return;
-                    if (e instanceof SessionExpiredError) return; // ya se está redirigiendo
-                    // fallo de red u otro -> simplemente no mostramos el email,
-                    // el resto de la pantalla sigue siendo usable
+                    if (e instanceof SessionExpiredError) return;
                 })
                 .finally(() => {
                     if (isActive) setLoadingAccount(false);
@@ -173,6 +171,17 @@ export default function SettingsScreen({ navigation }: Props) {
                 </TouchableOpacity>
 
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: spacing.lg }]}>Account</Text>
+
+                <TouchableOpacity
+                    style={[styles.card, shadow.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => navigation.navigate('ChangePassword')}
+                    activeOpacity={0.8}
+                >
+                    <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Change password</Text>
+                    <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                        Update the password you use to log in.
+                    </Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                     style={[styles.card, shadow.card, { backgroundColor: colors.card, borderColor: colors.border }]}
