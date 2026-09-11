@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from transformers import BertModel, BertTokenizer
 
-_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+_DEVICE = torch.device("cpu")
 _tokenizer_bert = BertTokenizer.from_pretrained("bert-base-uncased")
 _model_bert = BertModel.from_pretrained("bert-base-uncased").to(_DEVICE)
 _model_bert.eval()
