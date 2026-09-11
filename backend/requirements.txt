@@ -93,7 +93,6 @@ termcolor==3.3.0
 textsearch==0.0.24
 thinc==8.3.13
 tokenizers==0.23.2
-torch==2.14.0
 tqdm==4.70.0
 transformers==5.17.0
 typer==0.27.2
