@@ -2,9 +2,13 @@
 Generación de embeddings BERT — puerto de embeddings.py (SocialMindScan),
 solo la parte usada por gru_depression_bert.keras y cnn_suicidio_bert.keras.
 """
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
 import torch
 from transformers import BertModel, BertTokenizer
+
+
 
 _DEVICE = torch.device("cpu")
 _tokenizer_bert = BertTokenizer.from_pretrained("bert-base-uncased")
