@@ -7,9 +7,9 @@ ENV TF_ENABLE_ONEDNN_OPTS=0
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements_docker.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements_docker.txt
 
 # PyTorch CPU-only
 RUN pip install --no-cache-dir \
