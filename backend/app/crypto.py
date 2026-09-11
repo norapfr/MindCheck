@@ -1,27 +1,22 @@
-"""
-Cifrado en reposo del contenido del diario.
-
-El texto que escribe la usuaria es el dato más sensible de toda la app,
-así que se cifra ANTES de tocar la base de datos y se descifra solo al
-devolverlo a su propia dueña (nunca se guarda en claro en el disco).
-
-ENCRYPTION_KEY debe ser una clave Fernet real en producción (ver
-generate_key() más abajo para crear una). En dev, si no está puesta,
-se genera una de usar-y-tirar al arrancar — los datos NO sobreviven a
-un reinicio del proceso en ese caso, es solo para desarrollo local.
-"""
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
 
-# No depende de que app.config se haya importado antes -> carga el .env
-# aquí también, es idempotente (llamarlo dos veces no hace nada raro).
+from app.config import ENVIRONMENT
+
 load_dotenv()
 
 _ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 
 if not _ENCRYPTION_KEY:
+    if ENVIRONMENT == "production":
+        raise RuntimeError(
+            "ENCRYPTION_KEY no está configurada en producción. Define la "
+            "variable de entorno ENCRYPTION_KEY con una clave Fernet real "
+            "antes de arrancar — sin ella, los datos cifrados serán "
+            "ilegibles tras cada reinicio."
+        )
     print(
         "[MindCheck] AVISO: ENCRYPTION_KEY no está definida. Generando una "
         "clave temporal SOLO para desarrollo — los datos cifrados no serán "
@@ -52,6 +47,4 @@ def decrypt_text(token: str) -> str:
     try:
         return _fernet.decrypt(token.encode()).decode()
     except InvalidToken:
-        # Dato cifrado con una clave distinta (p.ej. cambiaste ENCRYPTION_KEY)
-        # -> no lo reventamos, devolvemos un placeholder visible.
         return "[No se pudo descifrar esta entrada]"

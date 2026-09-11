@@ -21,12 +21,28 @@ RISK_CATEGORIES = ["low", "moderate", "high"]
 # poco fiables. Se comprueba tras el preprocesado a propósito.
 MIN_WORDS_AFTER_CLEANING = 30
 
+# --- Entorno ---
+# ENVIRONMENT=production en el hosting real activa validaciones estrictas
+# de secretos más abajo. En local, sin esta variable, se asume "development".
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
 # --- Auth / JWT ---
-# En producción, esto DEBE venir de una variable de entorno / secreto real,
-# nunca hardcodeado ni versionado en git.
-JWT_SECRET = os.getenv("JWT_SECRET", "CHANGE_ME_INSECURE_DEV_SECRET")
+_DEV_JWT_SECRET = "CHANGE_ME_INSECURE_DEV_SECRET"
+JWT_SECRET = os.getenv("JWT_SECRET", _DEV_JWT_SECRET)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
 
+if ENVIRONMENT == "production" and JWT_SECRET == _DEV_JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET no está configurado en producción. Define la variable "
+        "de entorno JWT_SECRET con un secreto real antes de arrancar."
+    )
+
 # --- Base de datos ---
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mindcheck.db")
+
+if ENVIRONMENT == "production" and DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError(
+        "DATABASE_URL apunta a SQLite en producción. Define la variable "
+        "de entorno DATABASE_URL con tu connection string de Postgres."
+    )
