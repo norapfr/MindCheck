@@ -1,0 +1,101 @@
+"""
+Genera un baseline de referencia llamando a /analyze con un conjunto de
+textos de prueba, usando el backend ACTUAL (antes de cualquier conversión
+a TFLite/ONNX). Guarda las respuestas completas en baseline_scores.json
+para poder compararlas más adelante y confirmar que una conversión de
+runtime no cambia las predicciones.
+
+Requiere: pip install requests
+
+Uso:
+    python generate_baseline.py --url http://localhost:8000
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import requests
+
+TEST_TEXTS = [
+    {"id": 1, "text": "Today was a genuinely good day. I woke up early, went for a walk, and had coffee with a friend I hadn't seen in a while. Work was busy but manageable, and I actually felt productive for once. In the evening I cooked a proper meal instead of ordering takeout, which felt like a small win. I'm looking forward to the weekend and have a few plans I'm excited about. Overall I feel steady, calm, and grateful for the little things that made today easy."},
+    {"id": 2, "text": "I've been feeling pretty content lately. Nothing extraordinary is happening, but I'm settling into a routine that works for me. I go to the gym a few times a week, I'm sleeping better than I used to, and my relationships feel solid. There are small annoyances here and there, like traffic or a slow week at work, but nothing that really gets under my skin. I feel like I'm in a good place right now and I'm enjoying the calm."},
+    {"id": 3, "text": "Had a great weekend with my family. We went hiking on Saturday and just relaxed at home on Sunday, watching movies and eating way too much popcorn. I feel recharged heading into the week. My energy levels are good, my mood is stable, and I'm optimistic about a project I'm starting soon. It's nice when things line up like this. I know not every week will be this smooth, but I'm choosing to enjoy it while it lasts."},
+    {"id": 4, "text": "This week has been a lot. Work deadlines piled up and I barely had time to breathe between meetings. I'm tired most of the time now, and I notice I've been more irritable with people close to me, which I feel bad about. I still manage to get things done, but it takes more effort than usual. I know I need to rest, but every time I try to slow down, something else demands my attention. I'm hoping next week is calmer."},
+    {"id": 5, "text": "I don't really know how to describe how I've been feeling. It's not that anything specific is wrong, but there's this constant low hum of stress that doesn't go away. I go through the motions of the day, doing what needs to be done, but I don't feel much enthusiasm about any of it. Some days are better than others. I've been sleeping too much on weekends, like I'm trying to escape the week rather than rest from it."},
+    {"id": 6, "text": "Lately I feel disconnected from things I used to enjoy. I still go through my routines, but there's this heaviness that follows me around most of the day. I keep telling myself it will pass, the way it usually does, but it's been dragging on longer than I expected. I'm managing to keep up appearances at work and with friends, even though inside I feel tired in a way that sleep doesn't fix. I'm not sure what would actually help right now."},
+    {"id": 7, "text": "I keep replaying conversations in my head, wondering if I said the wrong thing or if people are quietly annoyed with me. It's exhausting to think this much about everything. I've been more withdrawn than usual, cancelling plans and telling myself I just need alone time, even though I'm not sure that's really true. Some nights I lie awake with this vague sense of dread about tomorrow, without being able to point to any single reason why."},
+    {"id": 8, "text": "I feel like I'm carrying something heavy that I can't put into words. Most days blur together and I struggle to find a reason to look forward to anything. I still function, I go to work, I answer messages, but it feels mechanical, like I'm watching myself from a distance. I don't feel like myself anymore and I don't know when that changed. Sometimes I wonder if things will ever feel lighter again, or if this is just how it is now."},
+    {"id": 9, "text": "I'm so tired of feeling this way and I don't know how much longer I can keep pretending I'm okay in front of everyone. Nothing brings me any real joy anymore, even things I used to love feel pointless now. I feel like a burden to the people around me, like they'd be better off if they didn't have to worry about me. I don't see things getting better and I'm running out of energy to keep trying."},
+    {"id": 10, "text": "I don't feel like there's much left in me. Every day feels heavier than the last and I can't remember the last time I felt genuinely happy about anything. I feel completely alone even when I'm surrounded by people, like nobody would really notice if I just disappeared. I'm exhausted from pretending everything is fine. I don't know what the point of continuing like this is anymore, and that thought scares me but it's also just how I feel."},
+    {"id": 11, "text": "Everything feels unbearable right now and I don't see any way out of how I'm feeling. I've been thinking about not wanting to be here anymore, like the world would be easier without me in it. I feel like a burden to everyone I love and I don't have the strength to keep fighting this. I'm exhausted in every possible way and I don't know how to ask for help without feeling like I'm just making things worse for everyone."},
+    {"id": 12, "text": "I can't keep living like this anymore, everything hurts too much and I don't see any reason to keep going. I feel completely hopeless about the future and I don't think anything is going to change no matter what I do. I've been thinking a lot about ending things because I just want the pain to stop. Nobody would really miss me and I feel like I've already said goodbye in my head to everything I used to care about."},
+]
+
+TEST_EMAIL = "norapf23@gmail.com"
+TEST_PASSWORD = "MindCheck1234"
+
+
+def get_token(base_url: str) -> str:
+    """Registra la cuenta de prueba, o inicia sesión si ya existe de una
+    ejecución anterior del script."""
+    register_resp = requests.post(
+        f"{base_url}/auth/register",
+        json={"email": TEST_EMAIL, "password": TEST_PASSWORD},
+    )
+    if register_resp.status_code == 201:
+        return register_resp.json()["access_token"]
+
+    if register_resp.status_code == 400:
+        login_resp = requests.post(
+            f"{base_url}/auth/login",
+            data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
+        )
+        login_resp.raise_for_status()
+        return login_resp.json()["access_token"]
+
+    register_resp.raise_for_status()
+    raise RuntimeError("No se pudo obtener un token de prueba.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--url", default="http://localhost:8000", help="URL base del backend")
+    parser.add_argument("--out", default="baseline_scores.json", help="Archivo de salida")
+    args = parser.parse_args()
+
+    base_url = args.url.rstrip("/")
+
+    print(f"[baseline] Autenticando contra {base_url}...")
+    token = get_token(base_url)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    results = []
+    for item in TEST_TEXTS:
+        print(f"[baseline] Analizando texto id={item['id']}...")
+        resp = requests.post(
+            f"{base_url}/analyze",
+            json={"text": item["text"]},
+            headers=headers,
+        )
+        if resp.status_code != 200:
+            print(f"  ERROR ({resp.status_code}): {resp.text}", file=sys.stderr)
+            continue
+
+        data = resp.json()
+        results.append({
+            "id": item["id"],
+            "depression_score": data["depression_score"],
+            "suicide_risk_score": data["suicide_risk_score"],
+            "risk_score": data["risk_score"],
+            "category": data["category"],
+            "high_risk": data["high_risk"],
+        })
+
+    out_path = Path(args.out)
+    out_path.write_text(json.dumps(results, indent=2, ensure_ascii=False))
+    print(f"[baseline] Guardado en {out_path.resolve()} ({len(results)} textos)")
+
+
+if __name__ == "__main__":
+    main()

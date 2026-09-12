@@ -1,0 +1,4 @@
+huggingface_hub==1.30.0
+requests==2.34.2
+tensorflow==2.21.0
+torch==2.14.0

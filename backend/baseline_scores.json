@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "depression_score": 0.30542871356010437,
+    "suicide_risk_score": 0.0012444022577255964,
+    "risk_score": 0.30542871356010437,
+    "category": "low",
+    "high_risk": false
+  },
+  {
+    "id": 2,
+    "depression_score": 0.47659265995025635,
+    "suicide_risk_score": 0.00808960385620594,
+    "risk_score": 0.47659265995025635,
+    "category": "moderate",
+    "high_risk": false
+  },
+  {
+    "id": 3,
+    "depression_score": 0.06726807355880737,
+    "suicide_risk_score": 0.0019144254038110375,
+    "risk_score": 0.06726807355880737,
+    "category": "low",
+    "high_risk": false
+  },
+  {
+    "id": 4,
+    "depression_score": 0.02161867916584015,
+    "suicide_risk_score": 0.0018795988289639354,
+    "risk_score": 0.02161867916584015,
+    "category": "low",
+    "high_risk": false
+  },
+  {
+    "id": 5,
+    "depression_score": 0.44175148010253906,
+    "suicide_risk_score": 0.10123486071825027,
+    "risk_score": 0.44175148010253906,
+    "category": "moderate",
+    "high_risk": false
+  },
+  {
+    "id": 6,
+    "depression_score": 0.5997653603553772,
+    "suicide_risk_score": 0.3954462707042694,
+    "risk_score": 0.5997653603553772,
+    "category": "moderate",
+    "high_risk": false
+  },
+  {
+    "id": 7,
+    "depression_score": 0.7132210731506348,
+    "suicide_risk_score": 0.41019147634506226,
+    "risk_score": 0.7132210731506348,
+    "category": "high",
+    "high_risk": true
+  },
+  {
+    "id": 8,
+    "depression_score": 0.6156163811683655,
+    "suicide_risk_score": 0.06373818218708038,
+    "risk_score": 0.6156163811683655,
+    "category": "moderate",
+    "high_risk": false
+  },
+  {
+    "id": 9,
+    "depression_score": 0.9165124893188477,
+    "suicide_risk_score": 0.9213029146194458,
+    "risk_score": 0.9213029146194458,
+    "category": "high",
+    "high_risk": true
+  },
+  {
+    "id": 10,
+    "depression_score": 0.8820743560791016,
+    "suicide_risk_score": 0.5280058979988098,
+    "risk_score": 0.8820743560791016,
+    "category": "high",
+    "high_risk": true
+  },
+  {
+    "id": 11,
+    "depression_score": 0.9321143627166748,
+    "suicide_risk_score": 0.9733526706695557,
+    "risk_score": 0.9733526706695557,
+    "category": "high",
+    "high_risk": true
+  },
+  {
+    "id": 12,
+    "depression_score": 0.977474570274353,
+    "suicide_risk_score": 0.9966658353805542,
+    "risk_score": 0.9966658353805542,
+    "category": "high",
+    "high_risk": true
+  }
+]

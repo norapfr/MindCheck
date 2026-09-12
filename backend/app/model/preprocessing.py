@@ -39,13 +39,14 @@ def _ensure_nltk_resources():
 _ensure_nltk_resources()
 
 _SPACY_MODEL_NAME = "en_core_web_sm"
+_SPACY_EXCLUDE = ["tagger", "parser", "attribute_ruler", "lemmatizer"]
 try:
-    _nlp = spacy.load(_SPACY_MODEL_NAME)
+    _nlp = spacy.load(_SPACY_MODEL_NAME, exclude=_SPACY_EXCLUDE)
 except OSError:
     from spacy.cli import download as spacy_download
 
     spacy_download(_SPACY_MODEL_NAME)
-    _nlp = spacy.load(_SPACY_MODEL_NAME)
+    _nlp = spacy.load(_SPACY_MODEL_NAME, exclude=_SPACY_EXCLUDE)
 
 
 def get_wordnet_pos(treebank_tag: str):
