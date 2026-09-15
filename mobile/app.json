@@ -9,10 +9,12 @@
     "ios": {
       "supportsTablet": true
     },
+    "newArchEnabled": true,
     "android": {
+      "package": "com.norapfr.mindcheck",
       "adaptiveIcon": {
         "backgroundColor": "#F8D7E3",
-        "foregroundImage": "./assets/logo_mindCheck.png"
+        "foregroundImage": "./assets/logo.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -21,7 +23,14 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      "react-native-fast-tflite",
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "26ccdf3f-fa3b-4176-b832-a3dd3cee1371"
+      }
+    }
   }
 }

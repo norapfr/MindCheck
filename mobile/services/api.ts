@@ -3,8 +3,16 @@ import { resetToOnboardingWithSessionExpired } from '../navigation/navigationRef
 
 const API_URL = 'http://192.168.8.102:8000';
 
-async function getToken() {
+async function getTokenInternal() {
     return SecureStore.getItemAsync('access_token');
+}
+
+// Exportado únicamente para la pantalla temporal de validación del
+// modelo local (ModelValidationScreen), que necesita autenticarse
+// directamente contra /preprocess sin pasar por el resto del flujo.
+// Quitar este export cuando esa pantalla de depuración se retire.
+export async function getToken() {
+    return getTokenInternal();
 }
 
 export class SessionExpiredError extends Error {
@@ -33,7 +41,7 @@ async function handleUnauthorized() {
 }
 
 async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
-    const token = await getToken();
+    const token = await getTokenInternal();
     const res = await safeFetch(`${API_URL}${path}`, {
         ...init,
         headers: {
@@ -117,7 +125,7 @@ export async function login(email: string, password: string) {
 }
 
 export async function hasSession() {
-    return (await getToken()) !== null;
+    return (await getTokenInternal()) !== null;
 }
 
 export async function logout() {
@@ -199,8 +207,8 @@ export class AnalyzeError extends Error {
     }
 }
 
-export async function analyzeEntry(text: string): Promise<AnalyzeResult> {
-    const res = await authorizedFetch('/analyze', {
+async function preprocessText(text: string): Promise<string> {
+    const res = await authorizedFetch('/preprocess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -211,7 +219,7 @@ export async function analyzeEntry(text: string): Promise<AnalyzeResult> {
         try {
             detail = (await res.json()).detail;
         } catch {
-            // no readable JSON body -> stays as generic error
+            // sin body legible -> se queda como error generico
         }
 
         if (detail === 'not_english') {
@@ -226,6 +234,39 @@ export async function analyzeEntry(text: string): Promise<AnalyzeResult> {
             );
         }
         throw new AnalyzeError('generic', 'Could not analyze this entry');
+    }
+
+    const { cleaned_text } = await res.json();
+    return cleaned_text;
+}
+
+/**
+ * Flujo completo de una entrada: limpieza de texto en el backend
+ * (/preprocess) -> inferencia LOCAL en el dispositivo (BERT ONNX +
+ * clasificadores TFLite) -> guardado en el backend (/entries), que es
+ * quien decide la categoría y el umbral de riesgo alto.
+ *
+ * onProgress reporta el progreso de la descarga del modelo BERT la
+ * primera vez que se usa en el dispositivo (puede tardar, son ~400MB).
+ */
+export async function analyzeEntry(
+    text: string,
+    onProgress?: (p: { fileName: string; progress: number }) => void
+): Promise<AnalyzeResult> {
+    const cleanedText = await preprocessText(text);
+
+    const { analyzeLocally, ensureModelsReady } = await import('../utils/riskAnalysis');
+    await ensureModelsReady(onProgress);
+    const scores = await analyzeLocally(cleanedText);
+
+    const res = await authorizedFetch('/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, ...scores }),
+    });
+
+    if (!res.ok) {
+        throw new AnalyzeError('generic', 'Could not save this entry');
     }
 
     return res.json();

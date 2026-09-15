@@ -44,3 +44,18 @@ def on_startup():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+import os
+
+import psutil
+
+
+@app.get("/debug/memory")
+def debug_memory():
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info()
+    return {
+        "rss_mb": round(mem.rss / 1024 / 1024, 1),
+        "vms_mb": round(mem.vms / 1024 / 1024, 1),
+    }

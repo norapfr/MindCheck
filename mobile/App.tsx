@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, DrawerActions, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, Switch, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Switch, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
@@ -14,12 +14,11 @@ import HistoryScreen from './screens/HistoryScreen';
 import EntryDetailScreen from './screens/EntryDetailScreen';
 import ResourcesScreen from './screens/ResourcesScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import ModelValidationScreen from './screens/ModelValidationScreen'; // TEMPORAL — quitar tras validar
 import { hasSession, JournalEntry } from './services/api';
 import { navigationRef } from './navigation/navigationRef';
 import { ThemeProvider, useTheme } from './theme/ThemeContext';
 import { spacing } from './theme';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { TouchableOpacity } from 'react-native';
 
 export type HistoryStackParamList = {
   HistoryList: undefined;
@@ -31,6 +30,7 @@ export type MainDrawerParamList = {
   HistoryStack: undefined;
   Resources: { autoTriggered?: boolean } | undefined;
   Settings: undefined;
+  ModelValidation: undefined; // TEMPORAL — quitar tras validar
 };
 
 export type RootStackParamList = {
@@ -118,6 +118,7 @@ function MainDrawer() {
             HistoryStack: 'stats-chart-outline',
             Resources: 'heart-outline',
             Settings: 'settings-outline',
+            ModelValidation: 'flask-outline',
           };
           return <Ionicons name={icons[route.name as keyof MainDrawerParamList]} size={size} color={color} />;
         },
@@ -127,6 +128,8 @@ function MainDrawer() {
       <Drawer.Screen name="HistoryStack" component={HistoryStackNavigator} options={{ title: 'History' }} />
       <Drawer.Screen name="Resources" component={ResourcesScreen} options={{ title: 'Help Resources' }} />
       <Drawer.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      {/* TEMPORAL: quitar esta pantalla en cuanto se confirme que el modelo local coincide con el baseline */}
+      <Drawer.Screen name="ModelValidation" component={ModelValidationScreen} options={{ title: 'Model Validation (DEV)' }} />
     </Drawer.Navigator>
   );
 }

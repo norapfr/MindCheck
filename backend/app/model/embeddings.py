@@ -1,27 +1,32 @@
 """
-Generación de embeddings BERT — versión ONNX Runtime, cargada desde
-disco local (app/model/weights/), sin PyTorch en producción.
-
-Convertido una vez con scripts/convert_bert_to_onnx.py.
+Generación de embeddings BERT — versión ONNX Runtime. El .onnx (con su
+.onnx_data externo, ~400MB) se descarga de Hugging Face Hub en el
+arranque en vez de vivir en el repo de git, para evitar el límite de
+100MB por archivo de GitHub y los límites de ancho de banda de Git LFS.
 """
 from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
+from huggingface_hub import hf_hub_download
 from transformers import BertTokenizer
 
 _WEIGHTS_DIR = Path(__file__).parent / "weights"
-_ONNX_PATH = _WEIGHTS_DIR / "bert_base_uncased.onnx"
-_TOKENIZER_DIR = _WEIGHTS_DIR / "bert_tokenizer"
+_TOKENIZER_DIR = _WEIGHTS_DIR / "bert_tokenizer"  # esto sí es pequeño, va en git normal
 
-if not _ONNX_PATH.exists():
-    raise FileNotFoundError(
-        f"No se encontró {_ONNX_PATH}. Genera el modelo con "
-        f"scripts/convert_bert_to_onnx.py y colócalo en {_WEIGHTS_DIR}."
-    )
+_ONNX_REPO = "norapfr/mindCheck_depression"  # o el repo que prefieras usar para esto
+_ONNX_FILE = "bert_base_uncased.onnx"
+_ONNX_DATA_FILE = "bert_base_uncased.onnx.data"
+
+print("[MindCheck] Descargando pesos ONNX de BERT desde Hugging Face Hub...")
+_onnx_path = hf_hub_download(repo_id=_ONNX_REPO, filename=_ONNX_FILE)
+# El .onnx_data debe descargarse al MISMO directorio que el .onnx, porque
+# onnxruntime lo busca por convención junto al archivo índice.
+hf_hub_download(repo_id=_ONNX_REPO, filename=_ONNX_DATA_FILE)
+print("[MindCheck] BERT (ONNX) descargado.")
 
 _tokenizer_bert = BertTokenizer.from_pretrained(str(_TOKENIZER_DIR))
-_session = ort.InferenceSession(str(_ONNX_PATH), providers=["CPUExecutionProvider"])
+_session = ort.InferenceSession(_onnx_path, providers=["CPUExecutionProvider"])
 
 
 def getting_embedding_bert(texto: str, max_seq: int = 132) -> np.ndarray:
