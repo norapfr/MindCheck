@@ -1,8 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { resetToOnboardingWithSessionExpired } from '../navigation/navigationRef';
 
-const API_URL = 'http://192.168.8.102:8000';
-
+const API_URL = 'https://mindcheck-backend-h77p.onrender.com';
 async function getTokenInternal() {
     return SecureStore.getItemAsync('access_token');
 }
