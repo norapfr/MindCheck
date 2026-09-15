@@ -29,7 +29,7 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
     const [feedback, setFeedback] = useState<Feedback>(null);
     const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
     const [prompt, setPrompt] = useState(() => getRandomPrompt());
-
+    const [downloadStatus, setDownloadStatus] = useState('');
     const loadStreak = useCallback(() => {
         getEntries()
             .then((entries) => setStreakInfo(computeStreak(entries)))
@@ -50,9 +50,12 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
         setFeedback(null);
         setSubmitting(true);
         try {
-            const result = await analyzeEntry(text);
+            const result = await analyzeEntry(text, (p) => {
+                setDownloadStatus(`Preparing on-device analysis: ${p.fileName} ${Math.round(p.progress * 100)}%`);
+            });
+            setDownloadStatus('');
             setText('');
-            setPrompt(getRandomPrompt(prompt)); // nueva sugerencia lista para la próxima entrada
+            setPrompt(getRandomPrompt(prompt));
             if (result.high_risk) {
                 navigation.navigate('Resources', { autoTriggered: true });
                 return;
@@ -60,7 +63,8 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
             setFeedback({ type: 'success', text: 'Entry saved. Thanks for writing today.' });
             loadStreak();
         } catch (e: any) {
-            if (e instanceof SessionExpiredError) return; // ya se está redirigiendo a Onboarding
+            setDownloadStatus('');
+            if (e instanceof SessionExpiredError) return;
             if (e instanceof NetworkError) {
                 setFeedback({ type: 'error', text: e.message });
             } else if (e instanceof AnalyzeError && e.kind !== 'generic') {
@@ -72,7 +76,6 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
             setSubmitting(false);
         }
     }
-
     function streakLabel(): string | null {
         if (!streakInfo) return null;
         if (streakInfo.streak === 0) return 'Write today to start a streak.';
@@ -136,6 +139,9 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
                     >
                         <Text style={styles.saveButtonText}>{submitting ? 'Saving…' : 'Save entry'}</Text>
                     </TouchableOpacity>
+                    {!!downloadStatus && (
+                        <Text style={[styles.feedbackText, { color: colors.textSecondary }]}>{downloadStatus}</Text>
+                    )}
 
                     {!!feedback && (
                         <Text
