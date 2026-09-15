@@ -14,11 +14,12 @@ import HistoryScreen from './screens/HistoryScreen';
 import EntryDetailScreen from './screens/EntryDetailScreen';
 import ResourcesScreen from './screens/ResourcesScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import ModelValidationScreen from './screens/ModelValidationScreen'; // TEMPORAL — quitar tras validar
+//import ModelValidationScreen from './screens/ModelValidationScreen'; // TEMPORAL — quitar tras validar
 import { hasSession, JournalEntry } from './services/api';
 import { navigationRef } from './navigation/navigationRef';
 import { ThemeProvider, useTheme } from './theme/ThemeContext';
 import { spacing } from './theme';
+import ModelValidationScreen from './screens/ModelValidationScreen';
 
 export type HistoryStackParamList = {
   HistoryList: undefined;
@@ -129,7 +130,7 @@ function MainDrawer() {
       <Drawer.Screen name="Resources" component={ResourcesScreen} options={{ title: 'Help Resources' }} />
       <Drawer.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       {/* TEMPORAL: quitar esta pantalla en cuanto se confirme que el modelo local coincide con el baseline */}
-      <Drawer.Screen name="ModelValidation" component={ModelValidationScreen} options={{ title: 'Model Validation (DEV)' }} />
+      {/* <Drawer.Screen name="ModelValidation" component={ModelValidationScreen} options={{ title: 'Model Validation (DEV)' }} /> */}
     </Drawer.Navigator>
   );
 }
