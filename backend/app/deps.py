@@ -31,8 +31,16 @@ def get_current_user(
     if user is None:
         raise credentials_error
 
+    # El JWT solo guarda "iat" con precisión de segundos (los JWT
+    # codifican las fechas como enteros Unix, sin microsegundos), pero
+    # password_changed_at en la DB sí tiene microsegundos. Truncamos
+    # ambos a la misma resolución antes de comparar; si no, cuando
+    # registro y login caen en el mismo segundo, el token recién emitido
+    # queda "antes" del cambio de contraseña por simple redondeo y se
+    # invalida de inmediato.
     token_issued_at = datetime.utcfromtimestamp(issued_at)
-    if token_issued_at < user.password_changed_at:
+    password_changed_at = user.password_changed_at.replace(microsecond=0)
+    if token_issued_at < password_changed_at:
         raise credentials_error  # token emitido ANTES del último cambio de contraseña -> invalido
 
     return user
