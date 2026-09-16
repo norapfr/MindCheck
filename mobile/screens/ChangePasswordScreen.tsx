@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../App';
-import { changePassword, PasswordChangeError, SessionExpiredError, NetworkError } from '../services/api';
+import { changePassword, PasswordChangeError, SessionExpiredError, NetworkError, RateLimitError } from '../services/api';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -58,8 +58,10 @@ export default function ChangePasswordScreen({ navigation }: Props) {
             setConfirmPassword('');
             setSuccess(true);
         } catch (e: any) {
-            if (e instanceof SessionExpiredError) return; // ya se está redirigiendo a Login
-            if (e instanceof NetworkError) {
+            if (e instanceof SessionExpiredError) return;
+            if (e instanceof RateLimitError) {
+                setFormError(e.message);
+            } else if (e instanceof NetworkError) {
                 setFormError(e.message);
             } else if (e instanceof PasswordChangeError) {
                 if (e.kind === 'wrong_current') {

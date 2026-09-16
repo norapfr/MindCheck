@@ -2,14 +2,11 @@ import * as SecureStore from 'expo-secure-store';
 import { resetToOnboardingWithSessionExpired } from '../navigation/navigationRef';
 
 const API_URL = 'https://mindcheck-backend-h77p.onrender.com';
+
 async function getTokenInternal() {
     return SecureStore.getItemAsync('access_token');
 }
 
-// Exportado únicamente para la pantalla temporal de validación del
-// modelo local (ModelValidationScreen), que necesita autenticarse
-// directamente contra /preprocess sin pasar por el resto del flujo.
-// Quitar este export cuando esa pantalla de depuración se retire.
 export async function getToken() {
     return getTokenInternal();
 }
@@ -23,6 +20,12 @@ export class SessionExpiredError extends Error {
 export class NetworkError extends Error {
     constructor() {
         super('Could not reach the server. Check your connection and try again.');
+    }
+}
+
+export class RateLimitError extends Error {
+    constructor() {
+        super("You're going too fast — please wait a moment and try again.");
     }
 }
 
@@ -53,6 +56,9 @@ async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Re
         await handleUnauthorized();
         throw new SessionExpiredError();
     }
+    if (res.status === 429) {
+        throw new RateLimitError();
+    }
 
     return res;
 }
@@ -74,6 +80,9 @@ export async function register(email: string, password: string) {
     });
 
     if (!res.ok) {
+        if (res.status === 429) {
+            throw new RateLimitError();
+        }
         if (res.status === 400) {
             throw new AuthError('email_in_use', 'This email is already in use.');
         }
@@ -112,6 +121,9 @@ export async function login(email: string, password: string) {
     });
 
     if (!res.ok) {
+        if (res.status === 429) {
+            throw new RateLimitError();
+        }
         if (res.status === 401) {
             throw new AuthError('invalid_credentials', 'Email or password is incorrect.');
         }
@@ -239,15 +251,6 @@ async function preprocessText(text: string): Promise<string> {
     return cleaned_text;
 }
 
-/**
- * Flujo completo de una entrada: limpieza de texto en el backend
- * (/preprocess) -> inferencia LOCAL en el dispositivo (BERT ONNX +
- * clasificadores TFLite) -> guardado en el backend (/entries), que es
- * quien decide la categoría y el umbral de riesgo alto.
- *
- * onProgress reporta el progreso de la descarga del modelo BERT la
- * primera vez que se usa en el dispositivo (puede tardar, son ~400MB).
- */
 export async function analyzeEntry(
     text: string,
     onProgress?: (p: { fileName: string; progress: number }) => void

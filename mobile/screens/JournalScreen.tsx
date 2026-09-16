@@ -9,7 +9,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MainDrawerParamList, RootStackParamList } from '../App';
-import { analyzeEntry, getEntries, AnalyzeError, SessionExpiredError, NetworkError } from '../services/api';
+import { analyzeEntry, getEntries, AnalyzeError, SessionExpiredError, NetworkError, RateLimitError } from '../services/api';
 import { computeStreak, StreakInfo } from '../utils/streak';
 import { getRandomPrompt } from '../utils/prompts';
 import { spacing, radius } from '../theme';
@@ -63,9 +63,10 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
             setFeedback({ type: 'success', text: 'Entry saved. Thanks for writing today.' });
             loadStreak();
         } catch (e: any) {
-            setDownloadStatus('');
             if (e instanceof SessionExpiredError) return;
-            if (e instanceof NetworkError) {
+            if (e instanceof RateLimitError) {
+                setFeedback({ type: 'error', text: e.message });
+            } else if (e instanceof NetworkError) {
                 setFeedback({ type: 'error', text: e.message });
             } else if (e instanceof AnalyzeError && e.kind !== 'generic') {
                 setFeedback({ type: 'error', text: e.message });

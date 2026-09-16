@@ -43,3 +43,17 @@ def on_startup():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# cara al futuro si se requiere una pagina web
+
+import os
+
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

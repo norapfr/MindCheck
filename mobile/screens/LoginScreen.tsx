@@ -4,7 +4,7 @@ import {
     ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NetworkError } from '../services/api';
+import { NetworkError, RateLimitError } from '../services/api';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../App';
@@ -40,7 +40,9 @@ export default function LoginScreen({ navigation, route }: Props) {
             await login(email, password);
             navigation.replace('Main');
         } catch (e: any) {
-            if (e instanceof AuthError) {
+            if (e instanceof RateLimitError) {
+                setFormError(e.message);
+            } else if (e instanceof AuthError) {
                 if (e.kind === 'invalid_credentials') {
                     setPasswordError(e.message);
                 } else {

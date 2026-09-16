@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../App';
-import { register, AuthError, NetworkError } from '../services/api';
+import { register, AuthError, NetworkError, RateLimitError } from '../services/api';
 import { spacing, radius, shadow } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -52,7 +52,9 @@ export default function RegisterScreen({ navigation }: Props) {
             await register(email, password);
             navigation.replace('Main');
         } catch (e: any) {
-            if (e instanceof AuthError) {
+            if (e instanceof RateLimitError) {
+                setFormError(e.message);
+            } else if (e instanceof AuthError) {
                 if (e.kind === 'email_in_use') {
                     setEmailError(e.message);
                 } else if (e.kind === 'weak_password') {
