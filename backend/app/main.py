@@ -6,8 +6,8 @@ from slowapi.errors import RateLimitExceeded
 
 from app.database import init_db
 from app.routes import account, analyze, auth
+from app.limiter import limiter
 
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="MindCheck API",

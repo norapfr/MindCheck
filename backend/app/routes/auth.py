@@ -7,7 +7,7 @@ from datetime import datetime
 from app.database import get_db, User
 from app.deps import get_current_user
 from app.security import hash_password, verify_password, create_access_token
-from app.main import limiter
+from app.limiter import limiter
 
 router = APIRouter()
 
