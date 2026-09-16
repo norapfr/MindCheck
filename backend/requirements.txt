@@ -19,3 +19,4 @@ contractions==0.1.73
 emoji==2.15.0
 langdetect==1.0.9
 psutil==7.2.2
+slowapi==0.1.10

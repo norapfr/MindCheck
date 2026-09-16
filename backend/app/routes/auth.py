@@ -1,13 +1,13 @@
-from datetime import datetime
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.database import get_db, User
 from app.deps import get_current_user
 from app.security import hash_password, verify_password, create_access_token
+from app.main import limiter
 
 router = APIRouter()
 
@@ -33,7 +33,8 @@ class ChangePasswordRequest(BaseModel):
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Este email ya está registrado")
@@ -48,8 +49,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # OAuth2PasswordRequestForm usa "username", lo tratamos como email.
+@limiter.limit("5/minute")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
@@ -60,27 +61,23 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @router.get("/me", response_model=MeResponse)
 def me(current_user: User = Depends(get_current_user)):
-    """Devuelve la cuenta actualmente autenticada, para que el frontend
-    pueda confirmar 'estás logueada como X' antes de acciones sensibles."""
     return MeResponse(email=current_user.email, created_at=current_user.created_at)
 
 
 @router.patch("/password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 def change_password(
+    request: Request,
     payload: ChangePasswordRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not verify_password(payload.current_password, current_user.hashed_password):
-        # 400, no 401: el token sigue siendo válido, es la contraseña
-        # actual la que no coincide. En el resto de la API, 401 significa
-        # "token inválido/expirado" y el frontend reacciona a eso cerrando
-        # la sesión automáticamente — reutilizarlo aquí lo confundiría con
-        # una expiración de sesión que no ha ocurrido.
         raise HTTPException(status_code=400, detail="wrong_current_password")
 
     if payload.new_password == payload.current_password:
         raise HTTPException(status_code=400, detail="same_password")
 
     current_user.hashed_password = hash_password(payload.new_password)
+    current_user.password_changed_at = datetime.utcnow()  # ver punto 2, más abajo
     db.commit()
