@@ -14,6 +14,7 @@ import { exportMyData, deleteMyAccount, logout, getMe, SessionExpiredError, Netw
 import { buildJournalReportHtml } from '../utils/reportHtml';
 import { spacing, radius, shadow } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
+import ConfirmModal from '../components/Confirmmodal';
 
 type Props = CompositeScreenProps<
     DrawerScreenProps<MainDrawerParamList, 'Settings'>,
@@ -29,6 +30,9 @@ export default function SettingsScreen({ navigation }: Props) {
 
     const [accountEmail, setAccountEmail] = useState<string | null>(null);
     const [loadingAccount, setLoadingAccount] = useState(true);
+
+    const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
@@ -117,61 +121,39 @@ export default function SettingsScreen({ navigation }: Props) {
         }
     }
 
-    function handleLogout() {
-        Alert.alert(
-            'Log out?',
-            'You can log back in anytime with your email and password.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Log out',
-                    onPress: async () => {
-                        setLoggingOut(true);
-                        try {
-                            await logout();
-                            goToOnboarding();
-                        } catch (e: any) {
-                            Alert.alert('Error', e.message);
-                        } finally {
-                            setLoggingOut(false);
-                        }
-                    },
-                },
-            ]
-        );
+    async function confirmLogout() {
+        setLoggingOut(true);
+        try {
+            await logout();
+            setLogoutModalVisible(false);
+            goToOnboarding();
+        } catch (e: any) {
+            setLogoutModalVisible(false);
+            Alert.alert('Error', e.message);
+        } finally {
+            setLoggingOut(false);
+        }
     }
 
-    function handleDelete() {
-        const label = accountEmail ? ` (${accountEmail})` : '';
-        Alert.alert(
-            `Delete your account${label}?`,
-            'This permanently deletes your account and every journal entry. This cannot be undone.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete everything',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setDeleting(true);
-                        try {
-                            await deleteMyAccount();
-                            goToOnboarding();
-                        } catch (e: any) {
-                            if (e instanceof SessionExpiredError) return;
-                            if (e instanceof RateLimitError) {
-                                Alert.alert('Too fast', e.message);
-                            } else if (e instanceof NetworkError) {
-                                Alert.alert('No connection', e.message);
-                            } else {
-                                Alert.alert('Error', e.message);
-                            }
-                        } finally {
-                            setDeleting(false);
-                        }
-                    },
-                },
-            ]
-        );
+    async function confirmDelete() {
+        setDeleting(true);
+        try {
+            await deleteMyAccount();
+            setDeleteModalVisible(false);
+            goToOnboarding();
+        } catch (e: any) {
+            setDeleteModalVisible(false);
+            if (e instanceof SessionExpiredError) return;
+            if (e instanceof RateLimitError) {
+                Alert.alert('Too fast', e.message);
+            } else if (e instanceof NetworkError) {
+                Alert.alert('No connection', e.message);
+            } else {
+                Alert.alert('Error', e.message);
+            }
+        } finally {
+            setDeleting(false);
+        }
     }
 
     return (
@@ -241,7 +223,7 @@ export default function SettingsScreen({ navigation }: Props) {
 
                 <TouchableOpacity
                     style={[styles.card, shadow.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    onPress={handleLogout}
+                    onPress={() => setLogoutModalVisible(true)}
                     disabled={loggingOut}
                     activeOpacity={0.8}
                 >
@@ -259,7 +241,7 @@ export default function SettingsScreen({ navigation }: Props) {
 
                 <TouchableOpacity
                     style={[styles.card, shadow.card, { backgroundColor: colors.card, borderColor: colors.danger }]}
-                    onPress={handleDelete}
+                    onPress={() => setDeleteModalVisible(true)}
                     disabled={deleting}
                     activeOpacity={0.8}
                 >
@@ -280,6 +262,27 @@ export default function SettingsScreen({ navigation }: Props) {
                     medical condition and does not replace professional help.
                 </Text>
             </ScrollView>
+
+            <ConfirmModal
+                visible={logoutModalVisible}
+                title="Log out?"
+                message="You can log back in anytime with your email and password."
+                confirmLabel="Log out"
+                loading={loggingOut}
+                onConfirm={confirmLogout}
+                onCancel={() => setLogoutModalVisible(false)}
+            />
+
+            <ConfirmModal
+                visible={deleteModalVisible}
+                title={`Delete your account${accountEmail ? ` (${accountEmail})` : ''}?`}
+                message="This permanently deletes your account and every journal entry. This cannot be undone."
+                confirmLabel="Delete everything"
+                destructive
+                loading={deleting}
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteModalVisible(false)}
+            />
         </SafeAreaView>
     );
 }

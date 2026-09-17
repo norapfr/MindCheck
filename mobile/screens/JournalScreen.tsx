@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView,
@@ -10,10 +10,12 @@ import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MainDrawerParamList, RootStackParamList } from '../App';
 import { analyzeEntry, getEntries, AnalyzeError, SessionExpiredError, NetworkError, RateLimitError } from '../services/api';
+import { isBertModelDownloaded } from '../utils/modelDownload';
 import { computeStreak, StreakInfo } from '../utils/streak';
 import { getRandomPrompt } from '../utils/prompts';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
+import ConfirmModal from '../components/Confirmmodal';
 
 type JournalScreenProps = CompositeScreenProps<
     DrawerScreenProps<MainDrawerParamList, 'Journal'>,
@@ -30,6 +32,12 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
     const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
     const [prompt, setPrompt] = useState(() => getRandomPrompt());
     const [downloadStatus, setDownloadStatus] = useState('');
+
+    // null = todavía no lo sabemos (comprobando en disco);
+    // false = primera vez, hace falta descargar/preparar el modelo.
+    const [modelsReady, setModelsReady] = useState<boolean | null>(null);
+    const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+
     const loadStreak = useCallback(() => {
         getEntries()
             .then((entries) => setStreakInfo(computeStreak(entries)))
@@ -45,8 +53,13 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
         }, [loadStreak])
     );
 
-    async function handleSave() {
-        if (!text.trim()) return;
+    useEffect(() => {
+        isBertModelDownloaded()
+            .then(setModelsReady)
+            .catch(() => setModelsReady(false));
+    }, []);
+
+    async function runAnalysis() {
         setFeedback(null);
         setSubmitting(true);
         try {
@@ -54,6 +67,7 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
                 setDownloadStatus(`Preparing on-device analysis: ${p.fileName} ${Math.round(p.progress * 100)}%`);
             });
             setDownloadStatus('');
+            setModelsReady(true); // ya quedó listo para la próxima vez
             setText('');
             setPrompt(getRandomPrompt(prompt));
             if (result.high_risk) {
@@ -77,6 +91,26 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
             setSubmitting(false);
         }
     }
+
+    function handleSave() {
+        if (!text.trim()) return;
+
+        // Si ya sabemos que es la primera vez (modelo aún no descargado),
+        // avisamos antes de arrancar — la descarga/preparación tarda más
+        // de lo normal y no queremos que el usuario piense que se colgó.
+        if (modelsReady === false) {
+            setShowFirstTimeModal(true);
+            return;
+        }
+
+        runAnalysis();
+    }
+
+    function confirmFirstTimeSetup() {
+        setShowFirstTimeModal(false);
+        runAnalysis();
+    }
+
     function streakLabel(): string | null {
         if (!streakInfo) return null;
         if (streakInfo.streak === 0) return 'Write today to start a streak.';
@@ -156,6 +190,16 @@ export default function JournalScreen({ navigation }: JournalScreenProps) {
                     )}
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            <ConfirmModal
+                visible={showFirstTimeModal}
+                title="One-time setup"
+                message="This is your first entry, so MindCheck needs to download and prepare the on-device analysis models. It'll take a bit longer than usual this time — after that, it'll be quick."
+                confirmLabel="Continue"
+                cancelLabel="Not now"
+                onConfirm={confirmFirstTimeSetup}
+                onCancel={() => setShowFirstTimeModal(false)}
+            />
         </SafeAreaView>
     );
 }
