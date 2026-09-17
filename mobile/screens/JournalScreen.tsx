@@ -15,7 +15,7 @@ import { computeStreak, StreakInfo } from '../utils/streak';
 import { getRandomPrompt } from '../utils/prompts';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
-import ConfirmModal from '../components/Confirmmodal';
+import ConfirmModal from '../components/modalConfirm';
 
 type JournalScreenProps = CompositeScreenProps<
     DrawerScreenProps<MainDrawerParamList, 'Journal'>,

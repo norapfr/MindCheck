@@ -33,6 +33,7 @@ export default function LoginScreen({ navigation, route }: Props) {
         setFormError('');
     }
 
+
     async function handleSubmit() {
         clearErrors();
         setLoading(true);

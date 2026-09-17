@@ -14,7 +14,8 @@ import { exportMyData, deleteMyAccount, logout, getMe, SessionExpiredError, Netw
 import { buildJournalReportHtml } from '../utils/reportHtml';
 import { spacing, radius, shadow } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
-import ConfirmModal from '../components/Confirmmodal';
+import ConfirmModal from '../components/modalConfirm';
+
 
 type Props = CompositeScreenProps<
     DrawerScreenProps<MainDrawerParamList, 'Settings'>,
