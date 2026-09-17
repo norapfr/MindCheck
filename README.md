@@ -17,6 +17,12 @@
   <a href="#-español"><strong>🇪🇸 Leer en Español</strong></a>
 </p>
 
+<p>
+  🌸 <strong><a href="https://mindcheck-backend-h77p.onrender.com/">Open MindCheck Landing Page</a></strong>
+</p>
+
+
+
 </div>
 
 <br/>
