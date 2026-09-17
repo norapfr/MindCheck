@@ -4,12 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { CommonActions } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { DrawerScreenProps } from '@react-navigation/drawer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MainDrawerParamList, RootStackParamList } from '../App';
-import { exportMyData, deleteMyAccount, logout, getMe, SessionExpiredError, NetworkError } from '../services/api';
+import { exportMyData, deleteMyAccount, logout, getMe, SessionExpiredError, NetworkError, RateLimitError } from '../services/api';
+import { buildJournalReportHtml } from '../utils/reportHtml';
 import { spacing, radius, shadow } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -21,6 +23,7 @@ type Props = CompositeScreenProps<
 export default function SettingsScreen({ navigation }: Props) {
     const { colors } = useTheme();
     const [exporting, setExporting] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
 
@@ -71,13 +74,46 @@ export default function SettingsScreen({ navigation }: Props) {
             }
         } catch (e: any) {
             if (e instanceof SessionExpiredError) return;
-            if (e instanceof NetworkError) {
+            if (e instanceof RateLimitError) {
+                Alert.alert('Too fast', e.message);
+            } else if (e instanceof NetworkError) {
                 Alert.alert('No connection', e.message);
             } else {
                 Alert.alert('Error', e.message);
             }
         } finally {
             setExporting(false);
+        }
+    }
+
+    async function handleExportPdf() {
+        setExportingPdf(true);
+        try {
+            const data: any = await exportMyData();
+            const html = buildJournalReportHtml({
+                email: data.email,
+                accountCreatedAt: data.account_created_at,
+                entries: data.entries,
+            });
+
+            const { uri } = await Print.printToFileAsync({ html });
+
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+            } else {
+                Alert.alert('Report ready', `Saved to ${uri}`);
+            }
+        } catch (e: any) {
+            if (e instanceof SessionExpiredError) return;
+            if (e instanceof RateLimitError) {
+                Alert.alert('Too fast', e.message);
+            } else if (e instanceof NetworkError) {
+                Alert.alert('No connection', e.message);
+            } else {
+                Alert.alert('Error', e.message ?? 'Could not generate the report.');
+            }
+        } finally {
+            setExportingPdf(false);
         }
     }
 
@@ -122,7 +158,9 @@ export default function SettingsScreen({ navigation }: Props) {
                             goToOnboarding();
                         } catch (e: any) {
                             if (e instanceof SessionExpiredError) return;
-                            if (e instanceof NetworkError) {
+                            if (e instanceof RateLimitError) {
+                                Alert.alert('Too fast', e.message);
+                            } else if (e instanceof NetworkError) {
                                 Alert.alert('No connection', e.message);
                             } else {
                                 Alert.alert('Error', e.message);
@@ -154,6 +192,24 @@ export default function SettingsScreen({ navigation }: Props) {
 
                 <TouchableOpacity
                     style={[styles.card, shadow.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={handleExportPdf}
+                    disabled={exportingPdf}
+                    activeOpacity={0.8}
+                >
+                    {exportingPdf ? (
+                        <ActivityIndicator color={colors.primary} />
+                    ) : (
+                        <>
+                            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Export as PDF report</Text>
+                            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                                A readable summary with your mood trend and entries — great for sharing with a therapist.
+                            </Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.card, shadow.card, { backgroundColor: colors.card, borderColor: colors.border }]}
                     onPress={handleExport}
                     disabled={exporting}
                     activeOpacity={0.8}
@@ -164,7 +220,7 @@ export default function SettingsScreen({ navigation }: Props) {
                         <>
                             <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Export my data</Text>
                             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
-                                Download everything MindCheck has stored about you, as a file.
+                                Download everything MindCheck has stored about you, as a raw data file.
                             </Text>
                         </>
                     )}

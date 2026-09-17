@@ -8,24 +8,40 @@
  * y un delegado GPU (core-ml, metal, android-gpu) podría usar
  * operaciones de menor precisión, dando resultados ligeramente
  * distintos a los ya confirmados como correctos.
+ *
+ * Nota: pasamos require(...) a través de expo-asset (Asset.fromModule
+ * + downloadAsync) para obtener una URI local (file://) explícita, en
+ * vez de dejar que loadTensorflowModel reciba el require() crudo. El
+ * HybridAssetLoader nativo de react-native-fast-tflite/Nitro no
+ * resuelve bien el nombre de recurso Android que Metro genera para
+ * estos archivos (falla con "no protocol"), así que evitamos ese
+ * camino resolviendo la URI nosotros mismos primero.
  */
+import { Asset } from 'expo-asset';
 import { loadTensorflowModel, TensorflowModel } from 'react-native-fast-tflite';
 
 let depressionModel: TensorflowModel | null = null;
 let suicideModel: TensorflowModel | null = null;
 
+async function resolveLocalUri(moduleId: number): Promise<string> {
+    const asset = Asset.fromModule(moduleId);
+    await asset.downloadAsync();
+    if (!asset.localUri) {
+        throw new Error('No se pudo resolver la URI local del modelo TFLite.');
+    }
+    return asset.localUri;
+}
+
 export async function loadClassifiers(): Promise<void> {
     if (!depressionModel) {
-        depressionModel = await loadTensorflowModel(
-            require('../assets/models/depression_model.tflite'),
-            []
-        );
+        const uri = await resolveLocalUri(require('../assets/models/depression_model.tflite'));
+        console.log('[tflite] depression model URI resuelta:', uri);
+        depressionModel = await loadTensorflowModel({ url: uri }, []);
     }
     if (!suicideModel) {
-        suicideModel = await loadTensorflowModel(
-            require('../assets/models/suicide_model.tflite'),
-            []
-        );
+        const uri = await resolveLocalUri(require('../assets/models/suicide_model.tflite'));
+        console.log('[tflite] suicide model URI resuelta:', uri);
+        suicideModel = await loadTensorflowModel({ url: uri }, []);
     }
 }
 
