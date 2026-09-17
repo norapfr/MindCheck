@@ -44,6 +44,13 @@ class JournalEntry(Base):
     owner = relationship("User", back_populates="entries")
 
 
+
+class AppDownload(Base):
+    __tablename__ = "app_downloads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    downloaded_at = Column(DateTime, default=datetime.utcnow)
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

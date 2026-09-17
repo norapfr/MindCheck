@@ -5,7 +5,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app.database import init_db
-from app.routes import account, analyze, auth
+from app.routes import account, analyze, auth, downloads
 from app.limiter import limiter
 
 
@@ -33,7 +33,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(analyze.router, tags=["analyze"])
 app.include_router(account.router, prefix="/account", tags=["account"])
-
+app.include_router(downloads.router, tags=["downloads"])
 
 @app.on_event("startup")
 def on_startup():
