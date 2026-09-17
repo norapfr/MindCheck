@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db, AppDownload
-from app.main import limiter
+from app.limiter import limiter
 
 router = APIRouter()
 
